@@ -1,0 +1,304 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  employees         Employee[]
+  departments       Department[]
+  shiftTemplates    ShiftTemplate[]
+  assignedShifts    AssignedShift[]
+  breakSchedules    BreakSchedule[]
+  leaveRequests     LeaveRequest[]
+  shiftSwapRequests ShiftSwapRequest[]
+  conflicts         SchedulingConflict[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+}
+
+model User {
+  id             String        @id @default(cuid())
+  email          String        @unique
+  passwordHash   String
+  role           String        // "MANAGER" | "EMPLOYEE"
+  name           String
+  avatar         String?
+  employeeId     String?
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  employee       Employee?     @relation(fields: [employeeId], references: [id])
+  auditLogs      AuditLog[]
+
+  @@index([email])
+  @@index([organizationId])
+}
+
+model Department {
+  id             String        @id @default(cuid())
+  name           String
+  code           String
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  employees      Employee[]
+  
+  @@unique([organizationId, code])
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employees   EmployeeSkill[]
+}
+
+model Employee {
+  id              String        @id @default(cuid())
+  employeeId      String        @unique // e.g. "EMP-1001"
+  name            String
+  email           String        @unique
+  role            String        // Job title: "Senior Support Specialist", etc.
+  seniority       String        // "Lead" | "Senior" | "Mid" | "Junior"
+  maxHoursPerWeek Float         @default(40.0)
+  hourlyRate      Float         @default(25.0)
+  status          String        @default("Full-Time") // "Full-Time" | "Part-Time" | "Contractor"
+  avatar          String?
+  
+  departmentId    String
+  department      Department    @relation(fields: [departmentId], references: [id])
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User[]
+  skills          EmployeeSkill[]
+  availability    EmployeeAvailability[]
+  assignedShifts  AssignedShift[]
+  breaks          BreakSchedule[]
+  leaveRequests   LeaveRequest[]
+  swapRequests    ShiftSwapRequest[] @relation("RequesterEmployee")
+  targetedSwaps   ShiftSwapRequest[] @relation("TargetEmployee")
+  conflicts       SchedulingConflict[]
+
+  @@index([departmentId])
+  @@index([organizationId])
+}
+
+model EmployeeSkill {
+  id         String   @id @default(cuid())
+  employeeId String
+  skillId    String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  skill      Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, skillId])
+}
+
+model EmployeeAvailability {
+  id                  String   @id @default(cuid())
+  employeeId          String
+  employee            Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  dayOfWeek           String   // "Monday", "Tuesday", etc.
+  isAvailable         Boolean  @default(true)
+  preferredShiftTypes String   // comma-separated
+  reason              String?
+  status              String   @default("Approved") // "Approved" | "Pending" | "Rejected"
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([employeeId, dayOfWeek])
+}
+
+model ShiftTemplate {
+  id                   String        @id @default(cuid())
+  name                 String
+  code                 String
+  startTime            String        // "09:00"
+  endTime              String        // "17:00"
+  durationHours        Float         @default(8.0)
+  breakDurationMinutes Int           @default(45)
+  minStaffing          Int           @default(8)
+  color                String        @default("#4F46E5")
+  description          String?
+  requiredRoles        String        // comma-separated role names
+  organizationId       String
+  organization         Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  assignedShifts       AssignedShift[]
+
+  @@unique([organizationId, code])
+}
+
+model AssignedShift {
+  id             String         @id @default(cuid())
+  employeeId     String
+  employee       Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  templateId     String?
+  template       ShiftTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  day            String         // "Monday", "Tuesday", etc.
+  date           String         // "2026-11-09"
+  startTime      String         // "09:00"
+  endTime        String         // "17:00"
+  durationHours  Float          @default(8.0)
+  role           String
+  department     String
+  status         String         @default("Published") // "Draft" | "Published" | "Completed"
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  breaks         BreakSchedule[]
+  conflicts      SchedulingConflict[]
+
+  @@index([employeeId, date])
+  @@index([organizationId, date])
+}
+
+model BreakSchedule {
+  id              String        @id @default(cuid())
+  shiftId         String
+  shift           AssignedShift @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  breakStart      String        // "12:00"
+  breakEnd        String        // "12:45"
+  durationMinutes Int           @default(45)
+  shiftName       String
+  status          String        @default("Scheduled") // "Scheduled" | "In Progress" | "Completed"
+  organizationId  String
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([employeeId])
+  @@index([shiftId])
+}
+
+model LeaveRequest {
+  id             String       @id @default(cuid())
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType      String       // "Paid Time Off (PTO)", "Sick Leave", "Family Care"
+  startDate      String       // "2026-11-10"
+  endDate        String       // "2026-11-12"
+  totalDays      Int          @default(1)
+  reason         String
+  status         String       @default("Pending") // "Pending" | "Approved" | "Rejected"
+  managerComment String?
+  submittedAt    String
+  reviewedAt     String?
+  reviewedById   String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([employeeId])
+  @@index([organizationId, status])
+}
+
+model ShiftSwapRequest {
+  id               String       @id @default(cuid())
+  requesterId      String
+  requester        Employee     @relation("RequesterEmployee", fields: [requesterId], references: [id], onDelete: Cascade)
+  requesterShiftId String
+  requesterDay     String
+  requesterTiming  String
+  targetId         String
+  target           Employee     @relation("TargetEmployee", fields: [targetId], references: [id], onDelete: Cascade)
+  targetShiftId    String?
+  targetDay        String
+  targetTiming     String
+  reason           String?
+  status           String       @default("Pending") // "Pending" | "Approved" | "Rejected"
+  submittedAt      String
+  reviewedAt       String?
+  reviewedById     String?
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([requesterId])
+  @@index([targetId])
+  @@index([organizationId, status])
+}
+
+model SchedulingConflict {
+  id                  String         @id @default(cuid())
+  shiftId             String?
+  shift               AssignedShift? @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  employeeId          String?
+  employee            Employee?      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type                String         // "OVERLAP" | "OVERTIME" | "AVAILABILITY" | "UNDERSTAFFED" | "REST_PERIOD" | "SKILL_MISMATCH"
+  severity            String         // "critical" | "warning" | "info"
+  description         String
+  suggestedResolution String
+  isResolved          Boolean        @default(false)
+  resolvedAt          DateTime?
+  resolvedById        String?
+  organizationId      String
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([organizationId, isResolved])
+}
+
+model Notification {
+  id               String       @id @default(cuid())
+  targetEmployeeId String?
+  title            String
+  message          String
+  type             String       @default("info") // "info" | "success" | "warning" | "critical"
+  isRead           Boolean      @default(false)
+  link             String?
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt        DateTime     @default(now())
+
+  @@index([organizationId, targetEmployeeId])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action         String       // "CREATE_SHIFT", "APPROVE_LEAVE", "RESOLVE_CONFLICT", etc.
+  entityType     String       // "SHIFT", "LEAVE", "SWAP", "EMPLOYEE", etc.
+  entityId       String?
+  details        String?      // JSON string of change summary
+  ipAddress      String?
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, action])
+  @@index([createdAt])
+}
+
