@@ -133,6 +133,16 @@ export const Navbar = ({ toggleSidebar, isSidebarCollapsed }) => {
           <span>Employee View</span>
         </button>
 
+        {/* Back to Insigrow Portal */}
+        <a
+          href="http://localhost:5000/#/industry/shifts"
+          className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#087F8C] bg-[#EBF6F7] hover:bg-[#DDF0F2] border border-[#087F8C]/30 rounded-lg transition-colors cursor-pointer shadow-2xs"
+          title="Return to Insigrow Industry Solutions Portal"
+        >
+          <Building2 className="w-3.5 h-3.5 text-[#087F8C]" />
+          <span>Insigrow Portal ↗</span>
+        </a>
+
         <div className="h-4 w-px bg-[#E5ECEE]"></div>
 
         {/* Notifications Popover */}

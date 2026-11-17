@@ -134,6 +134,11 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // --- Unified Login for both Managers and Employees ---
+  const login = useCallback(async (emailOrId, password, rememberMe = false) => {
+    return await loginEmployee(emailOrId, password, rememberMe);
+  }, [loginEmployee]);
+
   // --- Manager Registration ---
   const registerManager = useCallback(async (formData) => {
     setIsLoading(true);
@@ -195,6 +200,30 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
+  // --- Insigrow SSO Token Login ---
+  const loginWithSso = useCallback(async (token) => {
+    setIsLoading(true);
+    try {
+      const res = await api.ssoExchange(token);
+      if (res.success && res.user) {
+        if (res.token) {
+          localStorage.setItem(TOKEN_KEY, res.token);
+        }
+        setCurrentUser(res.user);
+        setIsLoading(false);
+        return { success: true, user: res.user, targetRoute: res.targetRoute };
+      }
+      setIsLoading(false);
+      return { success: false, error: 'SSO exchange failed.' };
+    } catch (err) {
+      setIsLoading(false);
+      return {
+        success: false,
+        error: err.message || 'SSO token exchange failed. Token may be expired or invalid.',
+      };
+    }
+  }, []);
+
   // --- Demo Quick Switcher Helper ---
   const loginAsDemo = useCallback(async (role) => {
     if (role?.toUpperCase() === 'MANAGER') {
@@ -207,10 +236,12 @@ export const AuthProvider = ({ children }) => {
   const value = {
     currentUser,
     isLoading,
+    login,
     loginManager,
     loginEmployee,
     registerManager,
     registerEmployee,
+    loginWithSso,
     logout,
     loginAsDemo,
     demoLogin: loginAsDemo,

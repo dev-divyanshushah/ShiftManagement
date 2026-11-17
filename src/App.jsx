@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AuthLandingPage } from './pages/auth/AuthLandingPage';
+import { LoginPage } from './pages/auth/LoginPage';
 import { ManagerAuthPage } from './pages/auth/ManagerAuthPage';
 import { EmployeeAuthPage } from './pages/auth/EmployeeAuthPage';
 import { Layout } from './components/layout/Layout';
@@ -31,9 +32,96 @@ import { AvailabilityPage } from './pages/employee/AvailabilityPage';
 import { EmployeeNotificationsPage } from './pages/employee/EmployeeNotificationsPage';
 import { EmployeeProfilePage } from './pages/employee/EmployeeProfilePage';
 
+// Dedicated Single-Sign-On Launch Handler
+const SsoLaunchHandler = () => {
+  const { loginWithSso } = useAuth();
+  const [status, setStatus] = React.useState('loading'); // 'loading' | 'success' | 'error'
+  const [errorMessage, setErrorMessage] = React.useState('');
+  const [targetPath, setTargetPath] = React.useState('/overview');
+
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token') || params.get('sso_token');
+
+    if (!token) {
+      setStatus('error');
+      setErrorMessage('Missing SSO launch token. Please launch the application from the Insigrow Portal.');
+      return;
+    }
+
+    try {
+      sessionStorage.setItem('insigrow_connected', 'true');
+    } catch (e) {}
+
+    loginWithSso(token).then((res) => {
+      if (res.success && res.user) {
+        setStatus('success');
+        const dest = res.targetRoute || (res.user.role === 'EMPLOYEE' ? '/employee/dashboard' : '/overview');
+        setTargetPath(dest);
+        window.history.replaceState({}, '', dest);
+      } else {
+        setStatus('error');
+        setErrorMessage(res.error || 'Authentication failed. Launch token may have expired or is invalid.');
+      }
+    });
+  }, [loginWithSso]);
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#F4F8F8] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-12 h-12 border-4 border-[#087F8C] border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 className="text-lg font-bold text-[#111827] mb-1">Authenticating Insigrow Session</h2>
+        <p className="text-sm text-[#4B5563]">Establishing secure enterprise Single-Sign-On...</p>
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="min-h-screen bg-[#F4F8F8] flex flex-col items-center justify-center p-6 text-center">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg border border-red-100 p-8">
+          <div className="w-12 h-12 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+            !
+          </div>
+          <h2 className="text-xl font-bold text-[#111827] mb-2">SSO Authentication Failed</h2>
+          <p className="text-sm text-[#6B7280] mb-6">{errorMessage}</p>
+          <div className="space-y-3">
+            <a
+              href="http://localhost:5000/#/industry/shifts"
+              className="inline-flex items-center justify-center w-full px-4 py-2.5 bg-[#087F8C] text-white font-medium rounded-lg hover:bg-[#06636D] transition-colors"
+            >
+              Return to Insigrow Portal ↗
+            </a>
+            <a
+              href="/portal"
+              className="inline-flex items-center justify-center w-full px-4 py-2 bg-gray-100 text-gray-700 font-medium rounded-lg hover:bg-gray-200 transition-colors text-sm"
+            >
+              Go to Standard Login
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <Navigate to={targetPath} replace />;
+};
+
 // Root Route Decider:
 const RootIndexHandler = () => {
   const { currentUser } = useAuth();
+
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token') || params.get('sso_token');
+  if (token) {
+    return <SsoLaunchHandler />;
+  }
+
+  const sourceParam = params.get('source');
+  if (sourceParam === 'insigrow') {
+    try { sessionStorage.setItem('insigrow_connected', 'true'); } catch (e) {}
+  }
+
   let user = currentUser;
   if (!user) {
     try {
@@ -65,11 +153,12 @@ function App() {
           <Routes>
             {/* Root: Authentication Landing Page if not logged in, or redirect if logged in */}
             <Route path="/" element={<RootIndexHandler />} />
+            <Route path="/sso-launch" element={<SsoLaunchHandler />} />
 
             {/* Dedicated Authentication Pages */}
+            <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/manager" element={<ManagerAuthPage />} />
             <Route path="/auth/employee" element={<EmployeeAuthPage />} />
-            <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/portal" element={<AuthLandingPage />} />
 
             {/* Manager Protected Experience */}

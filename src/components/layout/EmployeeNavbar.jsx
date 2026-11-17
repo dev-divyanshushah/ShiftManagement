@@ -77,6 +77,16 @@ export const EmployeeNavbar = () => {
           <span>Manager View</span>
         </button>
 
+        {/* Return to Insigrow Portal */}
+        <a
+          href="http://localhost:5000/#/industry/shifts"
+          className="hidden lg:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#087F8C] bg-[#EBF6F7] hover:bg-[#DDF0F2] border border-[#087F8C]/30 rounded-lg transition-colors cursor-pointer shadow-2xs"
+          title="Return to Insigrow Industry Solutions Portal"
+        >
+          <Building2 className="w-3.5 h-3.5 text-[#087F8C]" />
+          <span>Insigrow Portal ↗</span>
+        </a>
+
         {/* Week Indicator */}
         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F4F8F8] border border-[#E5ECEE] rounded-lg text-xs font-semibold text-[#173B49] font-mono">
           <Calendar className="w-3.5 h-3.5 text-[#57945A]" />

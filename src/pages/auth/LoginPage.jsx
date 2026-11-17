@@ -19,7 +19,18 @@ import { useAuth } from '../../context/AuthContext';
 export const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login, demoLogin, DEMO_ACCOUNTS } = useAuth();
+  const { currentUser, login, demoLogin, DEMO_ACCOUNTS } = useAuth();
+
+  React.useEffect(() => {
+    if (currentUser) {
+      const role = (currentUser.role || '').toUpperCase();
+      if (role === 'MANAGER') {
+        navigate('/overview', { replace: true });
+      } else {
+        navigate('/employee/dashboard', { replace: true });
+      }
+    }
+  }, [currentUser, navigate]);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,10 +50,11 @@ export const LoginPage = () => {
     const result = await login(email, password, rememberMe);
     setIsSubmitting(false);
 
-    if (result.success) {
-      if (result.user.role === 'Manager') {
+    if (result.success && result.user) {
+      const userRole = (result.user.role || '').toUpperCase();
+      if (userRole === 'MANAGER') {
         const fromPath = location.state?.from?.pathname;
-        const target = fromPath && !fromPath.startsWith('/employee') && fromPath !== '/login' ? fromPath : '/';
+        const target = fromPath && !fromPath.startsWith('/employee') && fromPath !== '/login' ? fromPath : '/overview';
         navigate(target, { replace: true });
       } else {
         const fromPath = location.state?.from?.pathname;

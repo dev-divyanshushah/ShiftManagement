@@ -66,6 +66,12 @@ export const api = {
 
   getMe: () => request('/auth/me'),
 
+  ssoExchange: (token) =>
+    request('/auth/sso-exchange', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    }),
+
   logout: () =>
     request('/auth/logout', {
       method: 'POST',
